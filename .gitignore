@@ -1,0 +1,6 @@
+*.env
+*respaldo*.json
+.env
+.jarvis_*
+claves.env
+datos.json
