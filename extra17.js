@@ -11,12 +11,14 @@ let ctx=null,out=null,an=null,gen=0,srcs=[],chk=null,micS=null,mon=null,warned=f
 function unlock(){try{
 if(!ctx){ctx=new(window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
 out=ctx.createGain();an=ctx.createAnalyser();an.fftSize=512;const mu=ctx.createGain();mu.gain.value=0;
-out.connect(ctx.destination);out.connect(an);an.connect(mu);mu.connect(ctx.destination)}
+const cp=ctx.createDynamicsCompressor();out.gain.value=0.9;out.connect(cp);cp.connect(ctx.destination);out.connect(an);an.connect(mu);mu.connect(ctx.destination)}
 if(ctx.state=='suspended')ctx.resume()}catch(e){}}
 ['pointerdown','keydown'].forEach(e=>document.addEventListener(e,unlock,{passive:true}));
 const clean=t=>String(t).replace(/https?:\/\/\S+/g,' enlace ').replace(/[*_#`~>|]/g,' ').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,' ').replace(/\s*\n+\s*/g,'. ').replace(/\.{2,}/g,'.').replace(/\s+/g,' ').trim();
 const split=t=>{if(t.length<=150)return[t];const m=t.match(/^(.+?[.!?])\s+(.+)$/s);return m?[m[1],m[2]]:[t]};
-async function tts(text){
+const TC=new Map();
+function tts(text){if(text.length>90)return tts0(text);const k=(cfg.gv||'')+'|'+cfg.pace+'|'+text;if(TC.has(k))return TC.get(k);const p=tts0(text);TC.set(k,p);p.catch(()=>TC.delete(k));if(TC.size>24)TC.delete(TC.keys().next().value);return p}
+async function tts0(text){
 const ks=[];if(key)ks.push(key);
 try{JSON.parse(localStorage.jkeys||'[]').forEach(o=>{if(o.k&&ks.indexOf(o.k)<0)ks.push(o.k)})}catch(e){}
 const style='Di en español, con una voz natural y fluida, '+PACE[+cfg.pace]+', sin cortes entre palabras: ';
@@ -35,6 +37,7 @@ throw err||new Error('sin respuesta')}
 function decode(b64){
 const bin=atob(b64),n=bin.length>>1,buf=ctx.createBuffer(1,n,24000),ch=buf.getChannelData(0);
 for(let i=0;i<n;i++){let v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);if(v>=32768)v-=65536;ch[i]=v/32768}
+const f=Math.min(240,n>>1);for(let i=0;i<f;i++){const g=i/f;ch[i]*=g;ch[n-1-i]*=g}
 return buf}
 function stopAll(){gen++;clearInterval(chk);srcs.forEach(s=>{try{s.onended=null;s.stop()}catch(e){}});srcs=[];stopMic()}
 const after=(s,f)=>{if(s._d)f();else s.onended=()=>{s._d=1;f()}};

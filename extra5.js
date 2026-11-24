@@ -11,7 +11,7 @@ function begin(){if(!act)return;
 rec=new SR();rec.lang=cfg.lang;rec.continuous=false;rec.interimResults=true;
 rec.onstart=()=>{if(act&&!txt())S('listening','ESCUCHANDO...')};
 rec.onresult=e=>{let it='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal){base=(base+' '+r[0].transcript).trim();cur=''}else it+=r[0].transcript}
-if(it)cur=it;last=Date.now();const t=txt();if(t)$('st').textContent='“'+t.slice(-40)+'”'};
+if(it)cur=it;last=Date.now();if(!it&&base)last-=Math.max(0,(cfg.silence||2500)-700);const t=txt();if(t)$('st').textContent='“'+t.slice(-40)+'”'};
 rec.onerror=e=>{const k=e.error;
 if(k=='not-allowed'||k=='service-not-allowed'){finish(false);S('','SIN PERMISO DE MICROFONO');msg('No tengo permiso del micrófono. En Chrome toca el candado junto a localhost → Permisos → Micrófono → Permitir.');return}
 if(k=='audio-capture'){finish(false);S('','MICROFONO OCUPADO');msg('El micrófono está ocupado por otra app. Si dejaste python jarvis.py abierto en Termux, ciérralo con CTRL+C.');return}
