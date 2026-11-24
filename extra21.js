@@ -88,13 +88,14 @@ if(ts.length)p.push('pendientes: '+ts.map(x=>x.t).join(', '));
 if(rs.length)p.push('avisos y alarmas: '+rs.map(r=>'a las '+hhmm(r.at)+' '+r.t).join(', '));
 return p.length?lab+', '+addr+', tiene '+p.join('. ')+'.':lab+' no tiene nada pendiente, '+addr+'.'}
 async function parse(t){const n=new Date();
-const p='Ahora es: '+n.toLocaleString('es',{dateStyle:'full',timeStyle:'short'})+' (hora local '+iso(n)+').\nEl usuario dijo: "'+t.replace(/"/g,"'")+'"\nResponde SOLO JSON con una de estas formas: {"a":"task_add","text":"el pendiente","at":"YYYY-MM-DDTHH:MM:SS o vacío"} para añadir un pendiente | {"a":"task_list"} si pregunta qué pendientes tiene | {"a":"task_done","text":"cuál"} para marcar uno como hecho | {"a":"task_remove","text":"cuál"} para borrar un pendiente | {"a":"alarm","text":"etiqueta corta","at":"YYYY-MM-DDTHH:MM:SS"} para despertador o alarma | {"a":"remind","text":"qué recordar","at":"YYYY-MM-DDTHH:MM:SS"} para recuérdame o avísame | {"a":"agenda","at":"YYYY-MM-DD"} si pregunta qué tiene hoy, mañana u otro día | {"a":"rem_list"} si pregunta qué alarmas o recordatorios tiene en general | {"a":"none"} si no es nada de eso.';
+const p='Ahora es: '+n.toLocaleString('es',{dateStyle:'full',timeStyle:'short'})+' (hora local '+iso(n)+').\nEl usuario dijo: "'+t.replace(/"/g,"'")+'"\nResponde SOLO JSON con una de estas formas: {"a":"task_add","text":"el pendiente","at":"YYYY-MM-DDTHH:MM:SS o vacío"} para añadir un pendiente | {"a":"task_list"} si pregunta qué pendientes tiene | {"a":"task_done","text":"cuál"} para marcar uno como hecho | {"a":"task_remove","text":"cuál","all":false} para borrar un pendiente (all true si dice todos los pendientes) | {"a":"alarm","text":"etiqueta corta","at":"YYYY-MM-DDTHH:MM:SS"} para despertador o alarma | {"a":"remind","text":"qué recordar","at":"YYYY-MM-DDTHH:MM:SS"} para recuérdame o avísame | {"a":"agenda","at":"YYYY-MM-DD"} si pregunta qué tiene hoy, mañana u otro día | {"a":"rem_list"} si pregunta qué alarmas o recordatorios tiene en general | {"a":"rem_remove","text":"palabras clave del aviso o vacío","hm":"HH:MM del aviso a borrar o vacío","day":"YYYY-MM-DD solo si dijo el día, si no vacío","all":false} para borrar, anular o cancelar una alarma o recordatorio (all true si dice todas) | {"a":"none"} si no es nada de eso.';
 return JSON.parse(await call({contents:[{role:'user',parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:200}}))}
 function run(a){const addr=A();
 switch(a.a){
 case 'task_add':{const due=a.at?new Date(a.at).getTime():0,d=isFinite(due)&&due>0?due:0;
 if(!a.text){say('¿Qué anoto, '+addr+'?');return}tAdd(a.text,d);draw();say('Anotado en sus pendientes, '+addr+': '+a.text+(d?', para '+fmt(d):'')+'.');return}
 case 'task_list':{const o=T.filter(x=>!x.done);say(o.length?'Tiene '+o.length+(o.length==1?' pendiente: ':' pendientes: ')+o.map(x=>x.t).join(', ')+'.':'No tiene pendientes, '+addr+'.');return}
+case 'task_remove':if(a.all){const op=T.filter(x=>!x.done);op.forEach(o=>tDel(o.id));draw();say(op.length?'Borré sus '+op.length+' pendientes, '+addr+'.':'No tiene pendientes, '+addr+'.');return}
 case 'task_done':case 'task_remove':{const m=match(a.text);if(!m){say('No encontré ese pendiente, '+addr+'.');return}
 if(a.a=='task_done')tDone(m.id,true);else tDel(m.id);draw();say((a.a=='task_done'?'Hecho: ':'Eliminado: ')+m.t+'.');return}
 case 'alarm':case 'remind':{let at=new Date(a.at).getTime();if(!isFinite(at)){say('No entendí la hora, '+addr+'.');return}
@@ -103,11 +104,20 @@ if(at<=Date.now()+2000){say('Esa hora ya pasó, '+addr+'.');return}
 const txt=String(a.text||'').trim()||(a.a=='alarm'?'Alarma':'Recordatorio');
 if(!rAdd(txt,at)){say('No pude guardarlo, '+addr+'.');return}draw();
 say('Listo, '+addr+'. '+(a.a=='alarm'?'Alarma ':'Aviso ')+fmt(at)+(txt!='Alarma'&&txt!='Recordatorio'?': '+txt:'')+'.');return}
+case 'rem_remove':{load();let c=R.slice();const ws=norm(a.text||'').split(' ').filter(x=>x.length>2);
+if(ws.length)c=c.filter(r=>{const n=norm(r.t);return ws.some(x=>n.includes(x))});
+const hm=/(\d{1,2}):(\d{2})/.exec(a.hm||'');
+if(hm)c=c.filter(r=>{const d=new Date(r.at);return d.getHours()==+hm[1]&&d.getMinutes()==+hm[2]});
+if(a.day)c=c.filter(r=>iso(new Date(r.at)).slice(0,10)==a.day);
+if(!c.length){say('No encontré esa alarma o recordatorio, '+addr+'.');return}
+if(!a.all&&c.length>1){say('Tengo '+c.length+' parecidos, '+addr+': '+c.slice(0,3).map(r=>fmt(r.at)+' '+r.t).join('. ')+'. Dígame la hora exacta.');return}
+c.forEach(r=>rDel(r));draw();
+say(c.length>1?'Borré '+c.length+' avisos, '+addr+'.':'Borrado: '+c[0].t+', '+addr+'.');return}
 case 'agenda':say(dayText(a.at,addr));return;
 case 'rem_list':{const l=R.slice(0,6);say(l.length?'Tiene '+R.length+(R.length==1?' aviso: ':' avisos: ')+l.map(r=>fmt(r.at)+' '+r.t).join('. ')+'.':'No tiene alarmas ni recordatorios por venir, '+addr+'.');return}
 }
 say('No entendí, '+addr+'.')}
-const GATE=/(pendiente|mi agenda|qu[eé] tengo|alarma|recordatorio|recu[eé]rdame|av[ií]same|d[ée]spi[eé]rtame|ya (hice|termin|compr|llam|pagu)|termin[eé])/i;
+const GATE=/(pendiente|mi agenda|qu[eé] tengo|alarma|recordatorio|recu[eé]rdame|av[ií]same|d[ée]spi[eé]rtame|ya (hice|termin|compr|llam|pagu)|termin[eé]|anula|borra|elimina|cancela|quita|ya no (quiero|necesito))/i;
 const isLocked=()=>{const l=$('lk');return !!l&&l.textContent=='🔒'};
 const prev=window.send;
 window.send=async function(t){t=(t||'').trim();

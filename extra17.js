@@ -15,7 +15,7 @@ out.connect(ctx.destination);out.connect(an);an.connect(mu);mu.connect(ctx.desti
 if(ctx.state=='suspended')ctx.resume()}catch(e){}}
 ['pointerdown','keydown'].forEach(e=>document.addEventListener(e,unlock,{passive:true}));
 const clean=t=>String(t).replace(/https?:\/\/\S+/g,' enlace ').replace(/[*_#`~>|]/g,' ').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,' ').replace(/\s*\n+\s*/g,'. ').replace(/\.{2,}/g,'.').replace(/\s+/g,' ').trim();
-const split=t=>{if(t.length<=320)return[t];const m=t.match(/^(.+?[.!?])\s+(.+)$/s);return m?[m[1],m[2]]:[t]};
+const split=t=>{if(t.length<=150)return[t];const m=t.match(/^(.+?[.!?])\s+(.+)$/s);return m?[m[1],m[2]]:[t]};
 async function tts(text){
 const ks=[];if(key)ks.push(key);
 try{JSON.parse(localStorage.jkeys||'[]').forEach(o=>{if(o.k&&ks.indexOf(o.k)<0)ks.push(o.k)})}catch(e){}
