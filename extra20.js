@@ -10,13 +10,13 @@ const enc=new TextEncoder(),dec=new TextDecoder();
 const b64=u=>{let s='';u.forEach(c=>s+=String.fromCharCode(c));return btoa(s)};
 const unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const ID='https://identitytoolkit.googleapis.com/v1/accounts:';
-let C=ld('jfbcfg',{}),A=ld('jacc',null),busy=false,editing=false;
+let C=Object.assign({},window.JFB||{},ld('jfbcfg',{})),A=ld('jacc',null),busy=false,editing=false;
 const saveC=()=>{localStorage.jfbcfg=JSON.stringify(C)};
 const saveA=()=>{if(A)localStorage.jacc=JSON.stringify(A);else localStorage.removeItem('jacc')};
 const ERR={EMAIL_EXISTS:'Ese correo ya tiene cuenta. Toca ENTRAR.',INVALID_LOGIN_CREDENTIALS:'Correo o contraseña incorrectos',INVALID_PASSWORD:'Correo o contraseña incorrectos',EMAIL_NOT_FOUND:'Ese correo no tiene cuenta',WEAK_PASSWORD:'La contraseña es muy débil (mínimo 6)',INVALID_EMAIL:'Correo no válido',TOO_MANY_ATTEMPTS_TRY_LATER:'Demasiados intentos. Espera unos minutos.',OPERATION_NOT_ALLOWED:'En Firebase activa el acceso por Correo y contraseña',USER_DISABLED:'Esta cuenta está desactivada',CREDENTIAL_TOO_OLD_LOGIN_AGAIN:'Cierra sesión, vuelve a entrar y repite',INVALID_IDP_RESPONSE:'Google rechazó el inicio de sesión'};
 function errMsg(j){const m=(j&&j.error&&j.error.message)||'';const k=m.split(' ')[0];if(ERR[k])return ERR[k];if(/API key not valid|API_KEY_INVALID/i.test(m))return 'La API key de Firebase no es válida';if(/PERMISSION_DENIED|Missing or insufficient/i.test(m))return 'Firestore bloqueó el acceso: revisa las reglas';return m||'Error de conexión'}
 async function post(url,body){let r,j;try{r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});j=await r.json()}catch(e){throw new Error('Sin conexión a internet')}if(!r.ok)throw new Error(errMsg(j));return j}
-function setSession(j){A={email:j.email,uid:j.localId,idToken:j.idToken,refreshToken:j.refreshToken,exp:Date.now()+(+j.expiresIn||3600)*1000-60000};saveA()}
+function setSession(j){A={email:j.email,uid:j.localId,idToken:j.idToken,refreshToken:j.refreshToken,exp:Date.now()+(+j.expiresIn||3600)*1000-60000};saveA();if(window.JACC)JACC.onLogin(j.localId,j.email)}
 async function token(){if(!A)throw new Error('Sin sesión');if(Date.now()<A.exp)return A.idToken;
 let r,j;try{r=await fetch('https://securetoken.googleapis.com/v1/token?key='+C.apiKey,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(A.refreshToken)});j=await r.json()}catch(e){throw new Error('Sin conexión a internet')}
 if(!r.ok){A=null;saveA();render();throw new Error('Sesión vencida: entra de nuevo')}
@@ -74,11 +74,11 @@ else if(!C.clientId)gb.append(note('Para Google, agrega el ID de cliente web en 
 else googleBtn(gb).catch(x=>gb.append(note(x.message,'#ff4f6d')));
 view.append(msgEl,hb('EDITAR CONFIGURACIÓN',()=>{editing=true;render()}))}
 function clearMem(){Object.keys(cfg).forEach(k=>delete cfg[k]);facts.length=0;col.length=0}
-function out(wipe){A=null;saveA();['jsynced','jpass','jsynchash'].forEach(k=>localStorage.removeItem(k));
+function out(wipe){if(window.JACC){JACC.onLogout(wipe);return}A=null;saveA();['jsynced','jpass','jsynchash'].forEach(k=>localStorage.removeItem(k));
 if(wipe){clearMem();SK.forEach(k=>localStorage.removeItem(k));setTimeout(()=>location.reload(),300)}else render()}
 async function delAcc(){if(!confirm('Se borrará tu cuenta y tus datos de la nube. Los datos de este celular se quedan. ¿Seguro?'))return;
 try{await fs('DELETE')}catch(e){}
-const t=await token();await post(ID+'delete?key='+C.apiKey,{idToken:t});out(false)}
+const t=await token();await post(ID+'delete?key='+C.apiKey,{idToken:t});out(true)}
 async function status(st){const j=await fs('GET');
 if(!j||!j.fields||!j.fields.blob){st.textContent='Nube: vacía. Escribe tu clave de cifrado y toca SUBIR AHORA.';return}
 const d=new Date(+j.fields.updated.integerValue);
