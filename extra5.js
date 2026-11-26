@@ -26,7 +26,7 @@ if(t&&n-last>(cfg.silence||2500))finish(true);
 else if(!t&&n-t0>12000)finish(false);
 else if(n-t0>90000)finish(true)},200)}
 function stopBarge(){if(bg){try{bg.onend=null;bg.onresult=null;bg.abort()}catch(e){}bg=null}}
-function interrupt(){gen++;stopBarge();speechSynthesis.cancel()}
+function interrupt(){gen++;stopBarge();if(typeof speechSynthesis!=='undefined')speechSynthesis.cancel()}
 function done(){stopBarge();if(state!='speaking')return;S('','TOCA PARA HABLAR');if(cfg.conv=='1')setTimeout(()=>{if(state=='')listen()},400)}
 function startBarge(my){if(!SR)return;stopBarge();try{bg=new SR();bg.lang=cfg.lang;bg.continuous=true;bg.interimResults=true;
 bg.onresult=e=>{let s='';for(let i=e.resultIndex;i<e.results.length;i++)s+=e.results[i][0].transcript;
@@ -38,12 +38,12 @@ const p=t.split(/(?<=[.!?])\s+/).filter(x=>x.trim());
 if(!p.length){S('','TOCA PARA HABLAR');return}
 S('speaking','HABLANDO // TOCA PARA INTERRUMPIR');
 setTimeout(()=>{if(my!=gen)return;
-const vs=speechSynthesis.getVoices(),v=vs.find(v=>v.name==cfg.voice)||vs.find(v=>v.lang==cfg.lang)||vs.find(v=>v.lang.startsWith('es'));
-let i=0;try{speechSynthesis.resume()}catch(e){}
+const vs=typeof speechSynthesis!=='undefined'?speechSynthesis.getVoices():[],v=vs.find(v=>v.name==cfg.voice)||vs.find(v=>v.lang==cfg.lang)||vs.find(v=>v.lang.startsWith('es'));
+let i=0;try{if(typeof speechSynthesis!=='undefined')speechSynthesis.resume()}catch(e){}
 p.forEach(x=>{const u=new SpeechSynthesisUtterance(x);u.lang=cfg.lang;if(v)u.voice=v;u.rate=+cfg.rate;u.pitch=+cfg.pitch;
 u.onend=()=>{if(my==gen&&++i==p.length)done()};
 u.onerror=e=>{if(my!=gen)return;if(e.error!='interrupted'&&e.error!='canceled'&&!warned){warned=true;msg('No pude hablar. En Ajustes del celular → Salida de texto a voz, instala una voz en español.')}if(++i==p.length)done()};
-speechSynthesis.speak(u)});
+if(typeof speechSynthesis!=='undefined')speechSynthesis.speak(u)});
 if(cfg.barge=='1')startBarge(my)},80)};
 function tap(){if(state=='listening')finish(true);else if(state=='speaking'){interrupt();S('','');listen()}else if(state!='thinking')listen()}
 ['mic','core','cmic'].forEach(i=>$(i).onclick=tap);
