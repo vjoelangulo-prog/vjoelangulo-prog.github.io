@@ -34,12 +34,20 @@ const a=Math.max(0,line-40),b=Math.min(L.length,line+40);
 return '(fragmento: líneas '+(a+1)+' a '+b+')\n'+L.slice(a,b).join('\n')}
 function keysList(){const ks=[];if(typeof key!=='undefined'&&key)ks.push(key);ld('jkeys',[]).forEach(o=>{if(o&&o.k&&ks.indexOf(o.k)<0)ks.push(o.k)});return ks}
 const parseJ=t=>{t=String(t);const a=t.indexOf('{'),b=t.lastIndexOf('}');return JSON.parse(a>=0&&b>a?t.slice(a,b+1):t)};
+const esm=m=>window.esErr?window.esErr(m):m;
+const GEMS=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
 async function gemJSON(system,user){let err=null;
-for(const k of keysList()){const c=new AbortController(),t=setTimeout(()=>c.abort(),75000);
-try{const r=await fetch(new URL('https://generativelanguage.googleapis.com/v1beta/models/'+GEM+':generateContent'),{method:'POST',headers:{'x-goog-api-key':k,'content-type':'application/json'},signal:c.signal,body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:6000}})});
-const j=await r.json();clearTimeout(t);if(j.error){err=new Error(j.error.message);continue}
-return j.candidates[0].content.parts[0].text}catch(e){clearTimeout(t);err=e}}
-throw err||new Error('No hay clave de Gemini')}
+const ks=keysList();
+if(!ks.length)throw new Error('No hay ninguna clave de Gemini guardada. Agrégala en Ajustes, Sistema.');
+for(let round=0;round<2;round++){
+for(const m of GEMS){for(const k of ks){
+const c=new AbortController(),t=setTimeout(()=>c.abort(),60000);
+try{const r=await fetch(new URL('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent'),{method:'POST',headers:{'x-goog-api-key':k,'content-type':'application/json'},signal:c.signal,body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:6000}})});
+const j=await r.json();clearTimeout(t);
+if(j.error){err=new Error(esm(j.error.message));continue}
+return j.candidates[0].content.parts[0].text}catch(e){clearTimeout(t);err=new Error(esm(e.message||String(e)))}}}
+if(round==0)await new Promise(r=>setTimeout(r,2500))}
+throw err||new Error('Gemini no respondió. Intenta de nuevo en unos segundos.')}
 async function claudeJSON(system,user){const k=localStorage.getItem('jdevclaude');if(!k)return null;
 const c=new AbortController(),t=setTimeout(()=>c.abort(),90000);
 try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':k,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},signal:c.signal,body:JSON.stringify({model:CLAUDE,max_tokens:6000,system:system,messages:[{role:'user',content:user}]})});
@@ -84,8 +92,17 @@ if(!Array.isArray(a.edits)||!a.edits.length){PEND=null;return{text:d.why||'No en
 let files;try{files=await validate(kind,a.edits)}catch(e){PEND=null;return{text:d.why+' No pude armar un arreglo seguro: '+e.message+'.'}}
 PEND={kind:kind,why:d.why,fix:d.fix,risk:d.risk,files:files,edits:a.edits,ts:Date.now(),tap:kind=='android'||d.risk=='alto'};
 return{pend:true,text:d.why+' Propongo: '+d.fix+'. Riesgo '+d.risk+'. '+(PEND.tap?'Para aplicarlo, toque APLICAR en la pestaña CÓDIGO.':'¿Lo aplico?')}}
+const RULES=[{re:/jarvisPruebaFallo/,file:'extra23.js',find:";setTimeout(function(){jarvisPruebaFallo()},4000);",replace:'',why:'Quedó una línea de prueba en extra23.js que llama a una función que no existe.',fix:'Quitar esa línea de prueba.',risk:'bajo'}];
+async function tryRules(R){
+for(const r of RULES){
+if(!R.errs.some(e=>r.re.test(e.m||'')))continue;
+let files;try{files=await validate('web',[{file:r.file,find:r.find,replace:r.replace}])}catch(e){continue}
+PEND={kind:'web',why:r.why,fix:r.fix,risk:r.risk,files:files,edits:[{file:r.file,find:r.find,replace:r.replace}],ts:Date.now(),tap:false};
+return{pend:true,text:r.why+' Propongo: '+r.fix+'. Riesgo '+r.risk+'. ¿Lo aplico?'}}
+return null}
 async function analyzeWeb(){const R=report();
 if(!R.errs.length&&!R.probs.length)return{text:resumen(R)};
+const rr=await tryRules(R);if(rr)return rr;
 const fs=filesFor(R);
 if(!fs.length)return{text:'Hay '+(R.errs.length+R.probs.length)+' avisos pero no puedo ubicar el archivo. Revisa el registro en la pestaña CÓDIGO.'};
 const srcs=[];for(const f of fs){const c=await readSrc('web',f).catch(()=>null);if(c)srcs.push({f:f,t:c.text,line:(R.errs.find(e=>e.f==f&&e.l)||{}).l})}
@@ -179,7 +196,7 @@ else await answerCode(t)
 const tabs=document.querySelector('.tabs'),pb=document.querySelector('.pb');
 if(!tabs||!pb||$('t8'))return;
 let busy=false,showMap=false,STAT={t:'',ok:null};
-const status=(t,ok)=>{STAT={t:String(t||''),ok:ok};const e=$('devst');if(e){e.textContent=STAT.t;e.style.color=ok===true?'#2fffa0':ok===false?'#ff4f6d':'#5b7a99'}};
+const status=(t,ok)=>{STAT={t:String(window.esErr?window.esErr(t||''):(t||'')),ok:ok};const e=$('devst');if(e){e.textContent=STAT.t;e.style.color=ok===true?'#2fffa0':ok===false?'#ff4f6d':'#5b7a99'}};
 const tb=mk('button','','CÓDIGO'),t8=mk('div');t8.className='tp';t8.id='t8';tb.dataset.t='t8';tabs.append(tb);pb.append(t8);
 tb.onclick=()=>{document.querySelectorAll('.tabs button,.tp').forEach(x=>x.classList.remove('on'));tb.classList.add('on');t8.classList.add('on');draw();try{tb.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}};
 const IN='width:100%;background:#0a1626;border:1px solid #1d3550;color:#cfe8ff;padding:10px;font:13px ui-monospace,monospace;margin-bottom:8px';
@@ -203,7 +220,7 @@ const U=ld('jdevundo',null);
 if(U&&U.items){const u=row('ÚLTIMO ARREGLO APLICADO');u.append(mk('div','font-size:12px;line-height:1.5;color:#cfe8ff;margin-bottom:6px',new Date(U.ts).toLocaleString('es',{dateStyle:'medium',timeStyle:'short'})+' · '+U.fix),hb('↶ DESHACER',async()=>{if(!confirm('¿Deshacer este arreglo?'))return;status('Deshaciendo…');await doUndo();status('Arreglo deshecho. Se publicará en 1 o 2 minutos.',true)}))}
 const e=row('REGISTRO DE ERRORES ('+R.errs.length+')');
 if(!R.errs.length)e.append(mk('div','font-size:12px;color:#5b7a99','Ninguno en los últimos 2 días.'));
-R.errs.slice(-8).reverse().forEach(x=>e.append(mk('div','font-size:11px;line-height:1.5;padding:6px 0;border-bottom:1px solid #ffffff12;color:#cfe8ff',new Date(x.ts).toLocaleTimeString('es',{hour:'numeric',minute:'2-digit'})+' · '+x.m+(x.f?' ('+x.f+(x.l?':'+x.l:'')+')':'')+(x.n>1?' ×'+x.n:''))));
+R.errs.slice(-8).reverse().forEach(x=>e.append(mk('div','font-size:11px;line-height:1.5;padding:6px 0;border-bottom:1px solid #ffffff12;color:#cfe8ff',new Date(x.ts).toLocaleTimeString('es',{hour:'numeric',minute:'2-digit'})+' · '+(window.esErr?window.esErr(x.m):x.m)+(x.f?' ('+x.f+(x.l?':'+x.l:'')+')':'')+(x.n>1?' ×'+x.n:''))));
 R.probs.forEach(p=>e.append(mk('div','font-size:11px;color:#ffb02e;margin-top:6px','⚠ '+p.m)));
 if(R.errs.length)e.append(hb('BORRAR REGISTRO',async()=>{LOG.clear();status('Registro borrado',true)}));
 const s=row('CONEXIÓN CON GITHUB (PARA APLICAR ARREGLOS)');
