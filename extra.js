@@ -1,3 +1,4 @@
+window.__baseSend=window.__baseSend||window.send;
 (function(){
 const U='https://generativelanguage.googleapis.com/v1beta/models/';
 const SK=['jkey','jkeys','jkeyi','jcfg','jfacts','jhist','jlog','jcol'];
