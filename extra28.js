@@ -14,6 +14,17 @@ const CMDS=[],TIMERS={},WRAPPED={},live={};
 const reloadSoon=()=>setTimeout(()=>{try{location.reload()}catch(e){}},900);
 const norm=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const findMod=q=>{q=norm(q);return mods.find(m=>norm(m.name)==q)||mods.find(m=>norm(m.name).includes(q)||q.includes(norm(m.name)))};
+const LS='jlock28',SALT='04e5261d16f9e236b7bba4ce27a0275a',HASH='0c9a30aed7ae0d0a3f1d2853d61e0c11e7415b7aa46777f09b42ce7b7b6ba39e',ITER=200000;
+let unlocked=localStorage.getItem(LS)===HASH,bad=0,until=0;
+const h2b=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16)));
+const b2h=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function pbk(pw){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);return b2h(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:h2b(SALT),iterations:ITER},k,256)))}
+async function tryUnlock(pw){
+const n=Date.now();if(n<until)return 'Espera '+Math.ceil((until-n)/1000)+' s antes de intentar otra vez';
+let h;try{h=await pbk(String(pw||'').trim())}catch(e){return 'Este dispositivo no permite verificar la clave'}
+if(h===HASH){unlocked=true;bad=0;try{localStorage.setItem(LS,HASH)}catch(e){}return ''}
+bad++;if(bad>=5){until=n+60000;bad=0}return 'Clave incorrecta'}
+const LOCKMSG='🔒 La auto-construcción está bloqueada. Solo el dueño de Jarvis la desbloquea en Ajustes → MÓDULOS con su clave.';
 function keys(){const ks=[];
 try{if(typeof key!=='undefined'&&key)ks.push(key)}catch(e){}
 try{ld('jkeys',[]).forEach(o=>{if(o&&o.k&&ks.indexOf(o.k)<0)ks.push(o.k)})}catch(e){}
@@ -89,6 +100,7 @@ if(p&&p.catch)p.catch(e=>fail(m.id,e))}catch(e){fail(m.id,e)}}
 window.addEventListener('error',ev=>{try{const f=String(ev.filename||'')+String((ev.error&&ev.error.stack)||'');const mt=f.match(/jmod_([a-z0-9]+)\.js/);if(mt)fail(mt[1],ev.error||ev.message)}catch(e){}});
 window.addEventListener('unhandledrejection',ev=>{try{const s=String((ev.reason&&ev.reason.stack)||'');const mt=s.match(/jmod_([a-z0-9]+)\.js/);if(mt)fail(mt[1],ev.reason)}catch(e){}});
 function startMods(){
+if(!unlocked)return;
 const boot=ld(BK,null),good=+localStorage.getItem(GK)||0;
 if(boot){const tries=(boot.tries||1)+1,off=[];
 mods.forEach(m=>{if(m.on&&(tries>=3||m.ts>good)){m.on=false;m.why='arranque fallido';off.push(m.name)}});
@@ -275,7 +287,15 @@ const list=document.createElement('div');list.id='mods28list';
 const safe=document.createElement('button');safe.className='hb';safe.style.cssText='margin:8px 6px 0 0';safe.textContent='🛡️ DESACTIVAR TODOS';
 safe.onclick=()=>{if(!confirm('¿Desactivar todos los módulos?'))return;mods.forEach(m=>{m.on=false});saveMods();reloadSoon()};
 const cards=document.createElement('div');cards.id='mods28cards';
-row.append(lab,info,list,safe,cards);
+const lockBox=document.createElement('div');
+const lt=document.createElement('div');lt.style.cssText='font-size:12px;line-height:1.6;color:#ff4f6d;margin:6px 0 8px';lt.textContent='🔒 BLOQUEADO. Solo el dueño de Jarvis puede activar la auto-construcción. Escribe la clave:';
+const pw=document.createElement('input');pw.type='password';pw.placeholder='clave del dueño';pw.autocomplete='off';pw.style.cssText='width:100%;background:#0a1626;border:1px solid #1d3550;color:#cfe8ff;padding:14px;font:15px ui-monospace,monospace;margin-bottom:10px';
+const lm=document.createElement('div');lm.style.cssText='font-size:12px;min-height:18px;color:#ff4f6d;margin-bottom:6px';
+const ub=document.createElement('button');ub.className='hb';ub.textContent='🔓 DESBLOQUEAR';
+const show=()=>{const u=unlocked;lockBox.style.display=u?'none':'block';[list,safe,cards,info].forEach(x=>{x.style.display=u?'':'none'})};
+ub.onclick=async()=>{ub.textContent='VERIFICANDO…';const rs=await tryUnlock(pw.value);ub.textContent='🔓 DESBLOQUEAR';pw.value='';if(rs){lm.textContent=rs;return}show();refreshPanel();startMods();note('🔓 Auto-construcción desbloqueada.')};
+lockBox.append(lt,pw,lm,ub);
+row.append(lab,lockBox,info,list,safe,cards);show();
 const d=$('diag25');
 if(d&&d.nextSibling)t2.insertBefore(row,d.nextSibling);else t2.insertBefore(row,t2.firstChild)}
 async function proposeIdeas(){
@@ -306,6 +326,7 @@ const LIST=/^\s*(?:jarvis[,:]?\s*)?(?:lista(?:r)?|mu[eé]strame|cu[aá]les\s+son
 const OFF=/^\s*(?:jarvis[,:]?\s*)?(desactiva|activa|elimina|borra|revierte)\s+(?:el\s+)?m[oó]dulo\s+(.+)$/i;
 async function intercept(t){
 let m;
+if(!unlocked){if(MODE.test(t)||/^\s*(?:jarvis[,:]?\s*)?(?:quiero que tengas|prog[rá]mate|cr[eé]ate|agr[eé]gate)\b/i.test(t)){add('u',t);note(LOCKMSG);return true}return false}
 if(pending){
 if(YES.test(t)){add('u',t);install();return true}
 if(NO.test(t)){add('u',t);pending=null;note('Descartado. No instalé nada.');return true}
