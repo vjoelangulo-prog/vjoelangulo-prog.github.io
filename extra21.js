@@ -117,7 +117,7 @@ case 'agenda':say(dayText(a.at,addr));return;
 case 'rem_list':{const l=R.slice(0,6);say(l.length?'Tiene '+R.length+(R.length==1?' aviso: ':' avisos: ')+l.map(r=>fmt(r.at)+' '+r.t).join('. ')+'.':'No tiene alarmas ni recordatorios por venir, '+addr+'.');return}
 }
 say('No entendí, '+addr+'.')}
-const GATE=/(pendiente|mi agenda|qu[eé] tengo|alarma|recordatorio|recu[eé]rdame|av[ií]same|d[ée]spi[eé]rtame|ya (hice|termin|compr|llam|pagu)|termin[eé]|anula|borra|elimina|cancela|quita|ya no (quiero|necesito))/i;
+const GATE=/(pendiente|mi agenda|qu[eé] tengo|alarma|recordatorio|recu[eé]rdame|av[ií]same|d[ée]spi[eé]rtame|ya (hice|termin|compr|llam|pagu)|termin[eé]|(anula|borra|elimina|cancela|quita)\w*.{0,30}(alarma|recordatorio|pendiente|aviso|todo|todas|todos)|ya no (quiero|necesito))/i;
 const isLocked=()=>{const l=$('lk');return !!l&&l.textContent=='🔒'};
 const prev=window.send;
 window.send=async function(t){t=(t||'').trim();

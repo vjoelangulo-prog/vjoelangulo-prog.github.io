@@ -1,7 +1,7 @@
 (function(){
 const $=i=>document.getElementById(i);
 const HD={'X-Jarvis':'1'};
-const WA=/whatsapp|wasap|guasap|mensaje|escr[ií]be|m[aá]nda|env[ií]a|d[ií]le/i;
+const WA=/whatsapp|wasap|guasap|\bmensaje\b|\b(?:escr[ií]be|m[aá]nda|env[ií]a)le\b|\bd[ií]le\b/i;
 const YES=/^\s*(s[ií]|sip|claro|dale|ok|okey|okay|confirm\w*|env[ií]a\w*|m[aá]nda\w*|adelante|hazlo|listo)(\s|$|[.,!¡])/i;
 const NO=/^\s*(no|cancela\w*|d[eé]jalo|olv[ií]dalo|para|det[eé]n\w*)(\s|$|[.,!¡])/i;
 let pend=null;

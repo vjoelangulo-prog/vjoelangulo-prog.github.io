@@ -14,7 +14,7 @@ const TR=/high demand|overload|unavailable|try again|503|500|internal|deadline|n
 window.call=function(b){
 return new Promise((resolve,reject)=>{
 const base=cfg.model,list=[base].concat(OK.filter(m=>m!=base));
-let done=false,n=0,fails=0,timers=[];
+let done=false,n=0,fails=0,timers=[];const H=!!(b&&b.generationConfig&&(b.generationConfig.maxOutputTokens||0)>=700);
 const end=(f,v)=>{if(done)return;done=true;timers.forEach(clearTimeout);f(v)};
 const launch=()=>{
 if(done||n>=list.length)return;
@@ -28,6 +28,6 @@ if(!TR.test((e&&e.message)||''))return end(reject,e);
 if(fails>=list.length)return end(reject,new Error('Google no respondió. Intenta de nuevo.'));
 launch()})};
 launch();
-timers.push(setTimeout(launch,1500),setTimeout(launch,3000),setTimeout(()=>end(reject,new Error('Google tardó más de 5 segundos. Intenta de nuevo.')),5000))
+timers.push(setTimeout(launch,H?9000:2000),setTimeout(launch,H?17000:4500),setTimeout(()=>end(reject,new Error('Google tardó demasiado. Intenta de nuevo.')),H?26000:9000))
 })};
 })();
