@@ -15,7 +15,12 @@ const cp=ctx.createDynamicsCompressor();out.gain.value=0.9;out.connect(cp);cp.co
 if(ctx.state=='suspended')ctx.resume()}catch(e){}}
 ['pointerdown','keydown'].forEach(e=>document.addEventListener(e,unlock,{passive:true}));
 const clean=t=>String(t).replace(/https?:\/\/\S+/g,' enlace ').replace(/[*_#`~>|]/g,' ').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,' ').replace(/\s*\n+\s*/g,'. ').replace(/\.{2,}/g,'.').replace(/\s+/g,' ').trim();
-const split=t=>{if(t.length<=150)return[t];const m=t.match(/^(.+?[.!?])\s+(.+)$/s);return m?[m[1],m[2]]:[t]};
+const split=t=>{if(t.length<=45)return[t];const ABR=/(?:^|\s)(?:[A-Za-zÁÉÍÓÚáéíóú]|Sr|Sra|Dr|Dra|Lic|Ing|etc|vs)\.$/;const o=[];let r=t;
+const take=mx=>{if(r.length<=mx){o.push(r);r='';return}let c=-1,re=/[.!?;:]\s/g,m;
+while((m=re.exec(r))&&m.index+1<=mx){if(!ABR.test(r.slice(0,m.index+1)))c=m.index+1}
+if(c<6){const k=r.lastIndexOf(', ',mx);c=k>=12?k+1:r.lastIndexOf(' ',mx)}
+if(c<6)c=mx;o.push(r.slice(0,c).trim());r=r.slice(c).trim()};
+take(90);if(r)take(170);if(r)o.push(r);return o.filter(Boolean)};
 const TC=new Map();
 function tts(text){if(text.length>90)return tts0(text);const k=(cfg.gv||'')+'|'+cfg.pace+'|'+text;if(TC.has(k))return TC.get(k);const p=tts0(text);TC.set(k,p);p.catch(()=>TC.delete(k));if(TC.size>24)TC.delete(TC.keys().next().value);return p}
 async function tts0(text){
