@@ -21,7 +21,10 @@ window.__mirrored=true}
 const IN='width:100%;background:#0a1626;border:1px solid #1d3550;color:#cfe8ff;padding:10px;font:13px ui-monospace,monospace;margin-bottom:8px';
 let T=[],R=[],showDone=false;
 if(N){const old=ld('jtasks',[]);if(old.length){old.forEach(o=>{if(!o.done&&o.t)N.taskAdd(o.t,String(o.due||0))});localStorage.removeItem('jtasks')}}
-function load(){
+function sweep(){const now=Date.now();const before=cfg.rem.length;
+cfg.rem=(cfg.rem||[]).filter(r=>r.done||r.at>now-600000);
+if(cfg.rem.length!==before)sv()}
+function load(){sweep();
 if(N){try{const o=JSON.parse(N.agendaGet());T=o.tasks||[];R=(o.rem||[]).map(r=>({id:r.id,t:r.t,at:r.at,src:'n'}))}catch(e){T=[];R=[]}}
 else{T=ld('jtasks',[]);R=[]}
 const now=Date.now();
@@ -61,8 +64,10 @@ if(rAdd(ti.value.trim()||'Alarma',at)){ti.value='';di.value='';say2('Guardada: s
 const row2=mk('div');row2.className='row';
 const selA=mk('select',IN);[['1','Sí: agregar alarmas al reloj del celular (si son en menos de 24h)'],['0','No: solo en la agenda de Jarvis']].forEach(o=>{const op=mk('option','',o[1]);op.value=o[0];selA.append(op)});selA.value=cfg.alarmnative;
 selA.onchange=()=>{cfg.alarmnative=selA.value;sv()};
-const bNotas=mb2=mk('button','','ENVIAR PENDIENTES A NOTAS');bNotas.className='hb';bNotas.onclick=()=>run({a:'notes_export'});
-row2.append(mk('label','','RELOJ Y NOTAS DEL CELULAR'),selA,bNotas);t7.append(row2);
+const bNotas=mk('button','','ENVIAR PENDIENTES A NOTAS');bNotas.className='hb';bNotas.onclick=()=>run({a:'notes_export'});
+const bClock=mk('button','','ABRIR RELOJ PARA BORRAR VENCIDAS');bClock.className='hb';
+bClock.onclick=()=>{location.href='intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.DEFAULT;package=com.google.android.deskclock;end'};
+row2.append(mk('label','','RELOJ Y NOTAS DEL CELULAR'),selA,bNotas,bClock,mk('div','font-size:11px;color:#5b7a99;margin-top:6px','Las alarmas que ya pasaron solo tú puedes borrarlas dentro de la app Reloj: Android no deja que otra app lo haga.'));t7.append(row2);
 const list=mk('div');list.id='aglist';
 t7.append(sum,st,form,list);
 function sec(t){list.append(mk('div','font-size:10px;letter-spacing:3px;color:var(--a);margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid #ffffff18',t))}
