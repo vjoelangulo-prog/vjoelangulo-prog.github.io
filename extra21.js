@@ -7,11 +7,17 @@ const N=(window.Android&&typeof window.Android.agendaGet==='function')?window.An
 const inApp=/JarvisApp/.test(navigator.userAgent);
 const ld=(k,d)=>{try{return JSON.parse(localStorage[k])||d}catch(e){return d}};
 cfg.rem=Array.isArray(cfg.rem)?cfg.rem:[];
+if(cfg.alarmnative===undefined)cfg.alarmnative='1';
 const pad=n=>('0'+n).slice(-2);
 const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':00';
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const A=()=>cfg.addr||'señor';
 const say=t=>{add('j',t);speak(t)};
+function mirrorClock(txt,at){window.__mirrored=false;
+if(cfg.alarmnative=='0'||at-Date.now()>864e5)return;
+const d=new Date(at);
+location.href='intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR='+d.getHours()+';i.android.intent.extra.alarm.MINUTES='+d.getMinutes()+';S.android.intent.extra.alarm.MESSAGE='+encodeURIComponent(txt)+';B.android.intent.extra.alarm.SKIP_UI=true;end';
+window.__mirrored=true}
 const IN='width:100%;background:#0a1626;border:1px solid #1d3550;color:#cfe8ff;padding:10px;font:13px ui-monospace,monospace;margin-bottom:8px';
 let T=[],R=[],showDone=false;
 if(N){const old=ld('jtasks',[]);if(old.length){old.forEach(o=>{if(!o.done&&o.t)N.taskAdd(o.t,String(o.due||0))});localStorage.removeItem('jtasks')}}
@@ -52,6 +58,11 @@ mb('+ PENDIENTE',()=>{if(!ti.value.trim()){say2('Escribe qué hay que hacer');re
 if(tAdd(ti.value,isFinite(due)?due:0)){ti.value='';di.value='';say2('Pendiente guardado',true);draw()}}),
 mb('⏰ ALARMA O RECORDATORIO',()=>{const at=di.value?new Date(di.value).getTime():0;if(!(at>Date.now())){say2('Elige una fecha y hora futuras');return}
 if(rAdd(ti.value.trim()||'Alarma',at)){ti.value='';di.value='';say2('Guardada: sonará '+fmt(at),true);draw()}else say2('No se pudo guardar')}),msg);
+const row2=mk('div');row2.className='row';
+const selA=mk('select',IN);[['1','Sí: agregar alarmas al reloj del celular (si son en menos de 24h)'],['0','No: solo en la agenda de Jarvis']].forEach(o=>{const op=mk('option','',o[1]);op.value=o[0];selA.append(op)});selA.value=cfg.alarmnative;
+selA.onchange=()=>{cfg.alarmnative=selA.value;sv()};
+const bNotas=mb2=mk('button','','ENVIAR PENDIENTES A NOTAS');bNotas.className='hb';bNotas.onclick=()=>run({a:'notes_export'});
+row2.append(mk('label','','RELOJ Y NOTAS DEL CELULAR'),selA,bNotas);t7.append(row2);
 const list=mk('div');list.id='aglist';
 t7.append(sum,st,form,list);
 function sec(t){list.append(mk('div','font-size:10px;letter-spacing:3px;color:var(--a);margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid #ffffff18',t))}
@@ -88,7 +99,7 @@ if(ts.length)p.push('pendientes: '+ts.map(x=>x.t).join(', '));
 if(rs.length)p.push('avisos y alarmas: '+rs.map(r=>'a las '+hhmm(r.at)+' '+r.t).join(', '));
 return p.length?lab+', '+addr+', tiene '+p.join('. ')+'.':lab+' no tiene nada pendiente, '+addr+'.'}
 async function parse(t){const n=new Date();
-const p='Ahora es: '+n.toLocaleString('es',{dateStyle:'full',timeStyle:'short'})+' (hora local '+iso(n)+').\nEl usuario dijo: "'+t.replace(/"/g,"'")+'"\nResponde SOLO JSON con una de estas formas: {"a":"task_add","text":"el pendiente","at":"YYYY-MM-DDTHH:MM:SS o vacío"} para añadir un pendiente | {"a":"task_list"} si pregunta qué pendientes tiene | {"a":"task_done","text":"cuál"} para marcar uno como hecho | {"a":"task_remove","text":"cuál","all":false} para borrar un pendiente (all true si dice todos los pendientes) | {"a":"alarm","text":"etiqueta corta","at":"YYYY-MM-DDTHH:MM:SS"} para despertador o alarma | {"a":"remind","text":"qué recordar","at":"YYYY-MM-DDTHH:MM:SS"} para recuérdame o avísame | {"a":"agenda","at":"YYYY-MM-DD"} si pregunta qué tiene hoy, mañana u otro día | {"a":"rem_list"} si pregunta qué alarmas o recordatorios tiene en general | {"a":"rem_remove","text":"palabras clave del aviso o vacío","hm":"HH:MM del aviso a borrar o vacío","day":"YYYY-MM-DD solo si dijo el día, si no vacío","all":false} para borrar, anular o cancelar una alarma o recordatorio (all true si dice todas) | {"a":"none"} si no es nada de eso.';
+const p='Ahora es: '+n.toLocaleString('es',{dateStyle:'full',timeStyle:'short'})+' (hora local '+iso(n)+').\nEl usuario dijo: "'+t.replace(/"/g,"'")+'"\nResponde SOLO JSON con una de estas formas: {"a":"task_add","text":"el pendiente","at":"YYYY-MM-DDTHH:MM:SS o vacío"} para añadir un pendiente | {"a":"task_list"} si pregunta qué pendientes tiene | {"a":"task_done","text":"cuál"} para marcar uno como hecho | {"a":"task_remove","text":"cuál","all":false} para borrar un pendiente (all true si dice todos los pendientes) | {"a":"alarm","text":"etiqueta corta","at":"YYYY-MM-DDTHH:MM:SS"} para despertador o alarma | {"a":"remind","text":"qué recordar","at":"YYYY-MM-DDTHH:MM:SS"} para recuérdame o avísame | {"a":"agenda","at":"YYYY-MM-DD"} si pregunta qué tiene hoy, mañana u otro día | {"a":"rem_list"} si pregunta qué alarmas o recordatorios tiene en general | {"a":"rem_remove","text":"palabras clave del aviso o vacío","hm":"HH:MM del aviso a borrar o vacío","day":"YYYY-MM-DD solo si dijo el día, si no vacío","all":false} para borrar, anular o cancelar una alarma o recordatorio (all true si dice todas) | {"a":"notes_export"} si pide mandar, pasar, exportar o guardar sus pendientes en notas o en otra app | {"a":"none"} si no es nada de eso.';
 return JSON.parse(await call({contents:[{role:'user',parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:200}}))}
 function run(a){const addr=A();
 switch(a.a){
@@ -103,7 +114,8 @@ if(a.a=='alarm')while(at<=Date.now())at+=864e5;
 if(at<=Date.now()+2000){say('Esa hora ya pasó, '+addr+'.');return}
 const txt=String(a.text||'').trim()||(a.a=='alarm'?'Alarma':'Recordatorio');
 if(!rAdd(txt,at)){say('No pude guardarlo, '+addr+'.');return}draw();
-say('Listo, '+addr+'. '+(a.a=='alarm'?'Alarma ':'Aviso ')+fmt(at)+(txt!='Alarma'&&txt!='Recordatorio'?': '+txt:'')+'.');return}
+mirrorClock(txt,at);
+say('Listo, '+addr+'. '+(a.a=='alarm'?'Alarma ':'Aviso ')+fmt(at)+(txt!='Alarma'&&txt!='Recordatorio'?': '+txt:'')+(window.__mirrored?' Y en el reloj del celular.':'')+'.');return}
 case 'rem_remove':{load();let c=R.slice();const ws=norm(a.text||'').split(' ').filter(x=>x.length>2);
 if(ws.length)c=c.filter(r=>{const n=norm(r.t);return ws.some(x=>n.includes(x))});
 const hm=/(\d{1,2}):(\d{2})/.exec(a.hm||'');
@@ -113,6 +125,11 @@ if(!c.length){say('No encontré esa alarma o recordatorio, '+addr+'.');return}
 if(!a.all&&c.length>1){say('Tengo '+c.length+' parecidos, '+addr+': '+c.slice(0,3).map(r=>fmt(r.at)+' '+r.t).join('. ')+'. Dígame la hora exacta.');return}
 c.forEach(r=>rDel(r));draw();
 say(c.length>1?'Borré '+c.length+' avisos, '+addr+'.':'Borrado: '+c[0].t+', '+addr+'.');return}
+case 'notes_export':{const o=T.filter(x=>!x.done);
+if(!o.length){say('No tiene pendientes para enviar, '+addr+'.');return}
+const body=o.map(x=>'• '+x.t+(x.due?' ('+fmt(x.due)+')':'')).join('\n');
+location.href='intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.SUBJECT='+encodeURIComponent('Mis pendientes de Jarvis')+';S.android.intent.extra.TEXT='+encodeURIComponent(body)+';end';
+say('Listo, '+addr+'. Elige en qué app guardarlos.');return}
 case 'agenda':say(dayText(a.at,addr));return;
 case 'rem_list':{const l=R.slice(0,6);say(l.length?'Tiene '+R.length+(R.length==1?' aviso: ':' avisos: ')+l.map(r=>fmt(r.at)+' '+r.t).join('. ')+'.':'No tiene alarmas ni recordatorios por venir, '+addr+'.');return}
 }
