@@ -5,20 +5,25 @@ let act=false,base='',cur='',last=0,t0=0,tm=null,gen=0,bg=null,warned=false;
 const txt=()=>(base+' '+cur).trim();
 const msg=t=>add('j',t,Date.now(),false);
 function stopRec(){try{rec.onend=null;rec.onresult=null;rec.onerror=null;rec.abort()}catch(e){}}
+function finish2(forced){act=false;clearInterval(tm);stopRec();const t=forced;base='';cur='';window.__lastInterim='';window.__earlySent=false;if(t)send(t);else S('','EN ESPERA // TOCA Y HABLA')}
 function finish(go){if(!act)return;act=false;clearInterval(tm);stopRec();const t=txt();base='';cur='';
 if(go&&t)send(t);else S('',t?'EN ESPERA':'NO TE ESCUCHE // TOCA Y HABLA')}
 function begin(){if(!act)return;
 rec=new SR();rec.lang=cfg.lang;rec.continuous=false;rec.interimResults=true;
 rec.onstart=()=>{if(act&&!txt())S('listening','ESCUCHANDO...')};
 rec.onresult=e=>{let it='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal){base=(base+' '+r[0].transcript).trim();cur=''}else it+=r[0].transcript}
-if(it)cur=it;last=Date.now();if(!it&&base)last-=Math.max(0,(cfg.silence||2500)-700);const t=txt();if(t)$('st').textContent='“'+t.slice(-40)+'”'};
+const STABLE_MS=700;
+if(it){if(it!==window.__lastInterim){window.__lastInterim=it;window.__interimAt=Date.now()}
+else if(Date.now()-(window.__interimAt||0)>STABLE_MS&&!window.__earlySent&&(base+' '+it).trim().split(/\s+/).length>=2){
+window.__earlySent=true;const t=(base+' '+it).trim();clearInterval(timer);finish2(t);return}}
+cur=it;last=Date.now();if(!it&&base)last-=Math.max(0,(cfg.silence||2500)-700);const t=txt();if(t)$('st').textContent='“'+t.slice(-40)+'”'};
 rec.onerror=e=>{const k=e.error;
 if(k=='not-allowed'||k=='service-not-allowed'){finish(false);S('','SIN PERMISO DE MICROFONO');msg('No tengo permiso del micrófono. En Chrome toca el candado junto a localhost → Permisos → Micrófono → Permitir.');return}
 if(k=='audio-capture'){finish(false);S('','MICROFONO OCUPADO');msg('El micrófono está ocupado por otra app. Si dejaste python jarvis.py abierto en Termux, ciérralo con CTRL+C.');return}
 if(k=='network'){finish(false);S('','SIN INTERNET');msg('La voz de Chrome necesita internet.')}};
 rec.onend=()=>{if(cur){base=(base+' '+cur).trim();cur=''}if(act)setTimeout(begin,150)};
 try{rec.start()}catch(e){setTimeout(begin,300)}}
-function listen(seed){if(!SR){msg('Usa Chrome para la voz');return}if(act)return;
+function listen(seed){window.__earlySent=false;window.__lastInterim='';if(!SR){msg('Usa Chrome para la voz');return}if(act)return;
 act=true;base=seed||'';cur='';t0=last=Date.now();S('listening','ESCUCHANDO...');
 begin();clearInterval(tm);
 tm=setInterval(()=>{const n=Date.now(),t=txt();
